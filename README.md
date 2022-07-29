@@ -13,4 +13,4 @@ The CWE lookups are from MITRE : https://cwe.mitre.org/data/index.html
 This Open-source project is available and contributed to under licenses that include terms that, for the protection of contributors, this Splunk Add-On for the ICS Advisory projects is offered "as-is," without warranty, and is not liable for damages resulting from using the app,reports,dashboards or the data from this project.
 
 
-*** For any bugs, comments or features requests, please DM me at https://www.linkedin.com/in/efik/
+*** For any bugs, comments or feature requests, please DM me at https://www.linkedin.com/in/efik/
