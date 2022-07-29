@@ -1,0 +1,277 @@
+<form version="1.1" theme="dark">
+  <label>COMMON WEAKNESS ENUMERATION (CWE) AND CVSS SEVERITY VIEW</label>
+  <description>Data provider:  The United States Cybersecurity and Infrastructure Security Agency, ICS-CERT</description>
+  <search id="basesearch">
+    <query>
+      | inputlookup ics_cert_project_lookup where CWE_Number IN ($ms_cwe$) AND Vendor IN ($ms_search_by_vendor$) AND (ICS-CERT_Number="*$text_search_by_ics_cert_number$*") AND Product IN ($ms_search_by_product$) AND CVSS_Severity IN ($ms_cvss_severity$) AND Product="*$ms_search_product_affected$*"
+      | addinfo
+| eval _time=strptime(Original_Release_Date,"%m/%d/%Y")
+| where _time&gt;=info_min_time and _time&lt;=info_max_time
+    </query>
+    <earliest>$global_time_range.earliest$</earliest>
+    <latest>$global_time_range.latest$</latest>
+    <sampleRatio>1</sampleRatio>
+  </search>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="multiselect" token="ms_search_by_vendor" searchWhenChanged="true">
+      <label>Search by Vendor</label>
+      <default>*</default>
+      <initialValue>*</initialValue>
+      <valuePrefix>"</valuePrefix>
+      <valueSuffix>"</valueSuffix>
+      <delimiter>,</delimiter>
+      <fieldForLabel>Vendor</fieldForLabel>
+      <fieldForValue>Vendor</fieldForValue>
+      <search>
+        <query>| makeresults 1 
+| eval Vendor="*" 
+| append 
+    [| inputlookup ics_cert_project_lookup 
+| stats values(Vendor) as Vendor] 
+| mvexpand Vendor</query>
+        <earliest>0</earliest>
+        <latest></latest>
+      </search>
+    </input>
+    <input type="multiselect" token="ms_search_by_product" searchWhenChanged="true">
+      <label>Search by Product</label>
+      <valuePrefix>"</valuePrefix>
+      <valueSuffix>"</valueSuffix>
+      <delimiter>,</delimiter>
+      <fieldForLabel>Product</fieldForLabel>
+      <fieldForValue>Product</fieldForValue>
+      <search>
+        <query>| makeresults 1 
+| eval Product="*" 
+| append 
+    [| inputlookup ics_cert_project_lookup 
+    | stats values(Product) as Product ] 
+| mvexpand Product</query>
+        <earliest>0</earliest>
+        <latest></latest>
+      </search>
+      <default>*</default>
+      <initialValue>*</initialValue>
+    </input>
+    <input type="multiselect" token="ms_cwe">
+      <label>CWE Description</label>
+      <default>*</default>
+      <initialValue>*</initialValue>
+      <valuePrefix>"</valuePrefix>
+      <valueSuffix>"</valueSuffix>
+      <delimiter> ,</delimiter>
+      <fieldForLabel>CWE Description</fieldForLabel>
+      <fieldForValue>CWE-ID</fieldForValue>
+      <search>
+        <query>| makeresults 1 
+| eval CWE-ID="*" 
+| append 
+    [ inputlookup software_development_cwe 
+    | eval CWE-ID = "CWE-" + 'CWE-ID' ] 
+| append 
+    [| inputlookup hardware_design_cwe 
+    | eval CWE-ID = "CWE-" + 'CWE-ID' ] 
+| append 
+    [| inputlookup research_concepts_cwe 
+    | eval CWE-ID = "CWE-" + 'CWE-ID' ] 
+| sort CWE-ID 
+| eval "CWE Description" = 'CWE-ID' +": " +Description 
+| fields CWE-ID Description "CWE Description"
+| dedup CWE-ID</query>
+      </search>
+    </input>
+    <input type="multiselect" token="ms_cvss_severity">
+      <label>CVSS Severity</label>
+      <choice value="*">*</choice>
+      <choice value="Critical">Critical</choice>
+      <choice value="High">High</choice>
+      <choice value="Low">Low</choice>
+      <choice value="Medium">Medium</choice>
+      <choice value="Not Applicable">Not Applicable</choice>
+      <choice value="Not Assigned">Not Assigned</choice>
+      <default>*</default>
+      <initialValue>*</initialValue>
+      <valuePrefix>"</valuePrefix>
+      <valueSuffix>"</valueSuffix>
+      <delimiter>, </delimiter>
+    </input>
+    <input type="text" token="ms_search_product_affected">
+      <label>Search by Product Affected</label>
+      <default>*</default>
+      <initialValue>*</initialValue>
+    </input>
+    <input type="text" token="text_search_by_ics_cert_number" searchWhenChanged="true">
+      <label>Search by ICS-CERT #</label>
+      <default>*</default>
+    </input>
+    <input type="time" token="global_time_range">
+      <label>Select date range</label>
+      <default>
+        <earliest>-30d@d</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Advisories by CWE's</title>
+      <chart>
+        <title>Showing top 10 by CWEs count</title>
+        <search base="basesearch">
+          <query>
+
+| fields Vendor CWE_Number 
+| rex field=CWE_Number mode=sed "s/[^\w-]+/*/g" 
+| makemv delim="*" CWE_Number 
+| mvexpand CWE_Number 
+| sort Vendor 
+| chart count(CWE_Number) as count over Vendor by CWE_Number useother=f
+| rename OTHER as CWE-OTHER 
+| addtotals CWE* 
+| sort - Total 
+| fields - Total 
+| head 10</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <search base="basesearch">
+          <query>
+| rex field=CWE_Number mode=sed "s/[^\w-]+/*/g" 
+| makemv delim="*" CWE_Number 
+| mvexpand CWE_Number 
+| strcat "https://www.cisa.gov/uscert/ics/advisories/" ICS-CERT_Number ics_cert_link
+| eval CWE-ID = ltrim(CWE_Number,"CWE-") 
+| lookup software_development_cwe CWE-ID outputnew Description 
+| lookup hardware_design_cwe CWE-ID outputnew Description 
+| lookup research_concepts_cwe CWE-ID outputnew Description 
+| eval "CWE Description" =  CWE_Number.": ".Description
+| stats count by  "CWE Description"
+| sort - count
+| streamstats count as "#"
+| table  "CWE Description" count</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>CVSS Severity by Vendors</title>
+        <search base="basesearch">
+          <query>
+| fields Vendor CVSS_Severity 
+| chart count(CVSS_Severity) as count over Vendor by CVSS_Severity useother=f 
+| addtotals 
+| sort - Total 
+| fields - Total 
+| head 10</query>
+        </search>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.drilldown">none</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Advisories by Severity</title>
+      <chart>
+        <search base="basesearch">
+          <query>
+| stats count by CVSS_Severity</query>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="charting.chart.showDataLabels">all</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Click on any line to go to the advisory web page</title>
+        <search base="basesearch">
+          <query>
+| eval CWE-ID = ltrim(CWE_Number,"CWE-") 
+| lookup software_development_cwe CWE-ID outputnew Description 
+| lookup hardware_design_cwe CWE-ID outputnew Description 
+| lookup research_concepts_cwe CWE-ID outputnew Description 
+| rename Original_Release_Date as "Release Date" ICS-CERT_Number as "ICS-CERT Number", ICS-CERT_Advisory_Title as "ICS-CERT Advisory Title", Cumulative_CVSS as "CVSS" CVSS_Severity as "Severity" 
+| streamstats count as "#" 
+| table "#" "Release Date" "ICS-CERT Number" Vendor Product "ICS-CERT Advisory Title" CVSS "Severity"</query>
+        </search>
+        <option name="drilldown">cell</option>
+        <drilldown>
+          <link target="_blank">https://www.cisa.gov/uscert/ics/advisories/$row.ICS-CERT Number|n$</link>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+</form>

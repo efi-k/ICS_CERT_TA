@@ -1,0 +1,184 @@
+<form version="1.1" theme="dark">
+  <label>ICS-CERT ADVISORY DASHBOARD</label>
+  <description>Data provider:  The United States Cybersecurity and Infrastructure Security Agency, ICS-CERT</description>
+  <search id="basesearch">
+    <query>
+      | inputlookup ics_cert_project_lookup where Company_Headquarters IN ($ms_vendor_hq_location$) AND Vendor IN ($ms_search_by_vendor$) AND (ICS-CERT_Number="*$text_search_by_ics_cert_number$*") AND Product IN ($ms_search_by_product$)
+| addinfo
+| eval _time=strptime(Original_Release_Date,"%m/%d/%Y")
+| where _time&gt;=info_min_time and _time&lt;=info_max_time
+    </query>
+    <earliest>$global_time_range.earliest$</earliest>
+    <latest>$global_time_range.latest$</latest>
+  </search>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="multiselect" token="ms_vendor_hq_location" searchWhenChanged="true">
+      <label>Vendor HQ Location</label>
+      <default>*</default>
+      <initialValue>*</initialValue>
+      <valuePrefix>"</valuePrefix>
+      <valueSuffix>"</valueSuffix>
+      <delimiter>,</delimiter>
+      <fieldForLabel>Country</fieldForLabel>
+      <fieldForValue>Country</fieldForValue>
+      <search>
+        <query>| makeresults 1 
+| eval Country="*" 
+| append 
+    [| inputlookup ics_cert_project_lookup 
+    | stats values(Company_Headquarters) as Country ] 
+| mvexpand Country</query>
+        <earliest>0</earliest>
+        <latest></latest>
+      </search>
+    </input>
+    <input type="multiselect" token="ms_search_by_vendor" searchWhenChanged="true">
+      <label>Search by Vendor</label>
+      <default>*</default>
+      <initialValue>*</initialValue>
+      <valuePrefix>"</valuePrefix>
+      <valueSuffix>"</valueSuffix>
+      <delimiter>,</delimiter>
+      <fieldForLabel>Vendor</fieldForLabel>
+      <fieldForValue>Vendor</fieldForValue>
+      <search>
+        <query>| makeresults 1 
+| eval Vendor="*" 
+| append 
+    [| inputlookup ics_cert_project_lookup 
+| stats values(Vendor) as Vendor] 
+| mvexpand Vendor</query>
+        <earliest>0</earliest>
+        <latest></latest>
+      </search>
+    </input>
+    <input type="text" token="text_search_by_ics_cert_number" searchWhenChanged="true">
+      <label>Search by ICS-CERT #</label>
+      <default>*</default>
+    </input>
+    <input type="multiselect" token="ms_search_by_product" searchWhenChanged="true">
+      <label>Search by Product</label>
+      <valuePrefix>"</valuePrefix>
+      <valueSuffix>"</valueSuffix>
+      <delimiter>,</delimiter>
+      <fieldForLabel>Product</fieldForLabel>
+      <fieldForValue>Product</fieldForValue>
+      <search>
+        <query>| makeresults 1 
+| eval Product="*" 
+| append 
+    [| inputlookup ics_cert_project_lookup 
+    | stats values(Product) as Product ] 
+| mvexpand Product</query>
+        <earliest>0</earliest>
+        <latest></latest>
+      </search>
+      <default>*</default>
+      <initialValue>*</initialValue>
+    </input>
+    <input type="time" token="global_time_range">
+      <label>Select date range</label>
+      <default>
+        <earliest>-30d@d</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <table>
+        <title>Click on any line to go to the advisory web page</title>
+        <search base="basesearch">
+          <query>
+| eval Original_Release_Date=strftime(strptime(Original_Release_Date,"%m/%d/%Y"),"%B %d,%Y")
+| rename ICS-CERT_Number as "ICS-CERT Number", Original_Release_Date as "Original Release Date", ICS-CERT_Advisory_Title as "ICS-CERT Advisory Title"
+| streamstats count as "#"
+| table  "#" "ICS-CERT Number" "Original Release Date" "ICS-CERT Advisory Title"</query>
+        </search>
+        <option name="count">10</option>
+        <drilldown>
+          <link target="_blank">https://www.cisa.gov/uscert/ics/advisories/$row.ICS-CERT Number|n$</link>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$alwaysHideCSS$">
+      <html>
+        <style>
+          #single_values{
+            width:10% !important;
+          }
+          #vendors_stat{
+            width:30% !important;
+          }
+          #vendors_map{
+            width:60% !important;
+          }
+        </style>
+      </html>
+    </panel>
+    <panel id="single_values">
+      <single>
+        <title>ICS-CERT ADVISORIES</title>
+        <search base="basesearch">
+          <query>
+| stats dc(ICS-CERT_Number)</query>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="rangeColors">["0x53a051","0x0877a6","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="refresh.display">progressbar</option>
+      </single>
+      <single>
+        <title>PRODUCTS</title>
+        <search base="basesearch">
+          <query>
+| stats dc(Product)</query>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="height">110</option>
+        <option name="rangeColors">["0x53a051","0x0877a6","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="refresh.display">progressbar</option>
+      </single>
+      <single>
+        <title>VENDORS</title>
+        <search base="basesearch">
+          <query>
+| stats dc(Vendor)</query>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </single>
+    </panel>
+    <panel id="vendors_stat">
+      <table>
+        <search base="basesearch">
+          <query>
+| stats count by Company_Headquarters | rename Company_Headquarters as "Vendor HQ", count as "# per Vendor"
+| sort - count</query>
+        </search>
+        <option name="count">15</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+    <panel id="vendors_map">
+      <map>
+        <search base="basesearch">
+          <query>
+| rename Company_Headquarters as country 
+| stats count by country 
+| geom geo_countries featureIdField=country</query>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="height">518</option>
+        <option name="mapping.choroplethLayer.colorBins">5</option>
+        <option name="mapping.choroplethLayer.colorMode">auto</option>
+        <option name="mapping.choroplethLayer.maximumColor">0x115BAD</option>
+        <option name="mapping.legend.placement">bottomright</option>
+        <option name="mapping.type">choropleth</option>
+        <option name="refresh.display">progressbar</option>
+      </map>
+    </panel>
+  </row>
+</form>

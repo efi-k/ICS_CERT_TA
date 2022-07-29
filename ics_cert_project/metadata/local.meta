@@ -1,0 +1,92 @@
+[app/ui]
+version = 9.0.0
+modtime = 1658773710.162848300
+
+[app/launcher]
+version = 9.0.0
+modtime = 1658773710.168853800
+
+[lookups/ICS-CERT_ADV_Master.csv]
+access = read : [ * ], write : [ admin ]
+export = system
+owner = admin
+version = 9.0.0
+modtime = 1658816851.644168900
+
+[lookups/hardware_design_cwe.csv]
+access = read : [ * ], write : [ admin ]
+export = system
+owner = admin
+version = 9.0.0
+modtime = 1658816857.466700700
+
+[lookups/research_concepts_cwe.csv]
+access = read : [ * ], write : [ admin ]
+export = system
+owner = admin
+version = 9.0.0
+modtime = 1658816870.461978900
+
+[lookups/software_development_cwe.csv]
+access = read : [ * ], write : [ admin ]
+export = system
+owner = admin
+version = 9.0.0
+modtime = 1658816877.429158100
+
+[transforms/ics_cert_project_lookup]
+access = read : [ * ], write : [ admin ]
+export = system
+owner = admin
+version = 9.0.0
+modtime = 1658816895.644640900
+
+[transforms/hardware_design_cwe]
+access = read : [ * ], write : [ admin ]
+export = system
+owner = admin
+version = 9.0.0
+modtime = 1658816926.323496400
+
+[transforms/software_development_cwe]
+access = read : [ * ], write : [ admin ]
+export = system
+owner = admin
+version = 9.0.0
+modtime = 1658816958.930707400
+
+[transforms/research_concepts_cwe]
+access = read : [ * ], write : [ admin ]
+export = system
+owner = admin
+version = 9.0.0
+modtime = 1658816989.524511500
+
+[nav/default]
+version = 9.0.0
+modtime = 1659048163.271735800
+
+[views/vendors__product_affected]
+owner = admin
+version = 9.0.0
+modtime = 1658866754.526975900
+
+[views/icscert_advisory_dashboard_classic]
+access = read : [ * ], write : [ admin, power ]
+export = system
+owner = admin
+version = 9.0.0
+modtime = 1659100539.907900300
+
+[views/common_weakness_enumeration_cwe_view_classic]
+access = read : [ * ], write : [ admin, power ]
+export = system
+owner = nobody
+version = 9.0.0
+modtime = 1659100549.523044500
+
+[]
+access = read : [ * ], write : [ admin, power ]
+export = system
+version = 9.0.0
+modtime = 1659108206.771041400
