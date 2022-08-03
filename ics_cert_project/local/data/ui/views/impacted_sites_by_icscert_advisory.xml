@@ -1,0 +1,122 @@
+<form version="1.1" theme="dark">
+  <label>IMPACTED SITES BY ICS-CERT ADVISORY</label>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="multiselect" token="ms_search_by_vendor" searchWhenChanged="true">
+      <label>Search by Vendor</label>
+      <default>*</default>
+      <initialValue>*</initialValue>
+      <valuePrefix>"</valuePrefix>
+      <valueSuffix>"</valueSuffix>
+      <delimiter>,</delimiter>
+      <fieldForLabel>Vendor</fieldForLabel>
+      <fieldForValue>Vendor</fieldForValue>
+      <search>
+        <query>| makeresults 1 
+| eval Vendor="*" 
+| append 
+    [| inputlookup ics_cert_project_lookup 
+| stats values(Vendor) as Vendor] 
+| mvexpand Vendor</query>
+        <earliest>0</earliest>
+        <latest></latest>
+      </search>
+    </input>
+    <input type="text" token="text_search_by_ics_cert_number" searchWhenChanged="true">
+      <label>Search by ICS-CERT #</label>
+      <default>*</default>
+    </input>
+    <input type="text" token="ms_search_by_site_id" searchWhenChanged="true">
+      <label>Search by site_id (free text)</label>
+      <default>*</default>
+    </input>
+    <input type="time" token="global_time_range" searchWhenChanged="true">
+      <label>Select date range</label>
+      <default>
+        <earliest>-30d@d</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <table>
+        <search>
+          <query>| `assets` 
+| eval asset_vendor=lower(asset_vendor) 
+| fields asset_vendor site_id 
+| stats values(asset_vendor) as asset_vendor by site_id 
+| mvexpand asset_vendor 
+    ``` At this point we have a list of all vendors, by facility(site_id) according to the assets &amp; identities module ```
+    ``` -&gt; The next eval sub-search returns a field containing concatenated strings of ICS advisory serial number and the vendor mentioned in the advisory, delimited by a pipeline ``` 
+| eval 
+    [| inputlookup ics_cert_project_lookup 
+    | addinfo 
+    | eval _time=strptime(Original_Release_Date,"%m/%d/%Y") 
+    | where _time&gt;=info_min_time and _time&lt;=info_max_time 
+    | append 
+        [| makeresults 1 
+        | eval ICS-CERT_Number="no_results" 
+        | eval Vendor ="no_results"] 
+    | fields ICS-CERT_Number Vendor 
+    | eval number_vendor = 'Vendor'.'ICS-CERT_Number'."|" 
+    | fields number_vendor 
+    | mvcombine number_vendor 
+    | return number_vendor] 
+    ``` -&gt; ``` 
+    ``` adding to each vendor, per site the list of all advisories number and their mentioned vendor ``` 
+| makemv delim="|" number_vendor 
+| mvexpand number_vendor 
+    ``` extracting the ICS advisory number and mentioned vendor ``` 
+| rex field=number_vendor "\s*(?&lt;ics_vendor&gt;.+)(?&lt;ICS_Number&gt;ICSA-.+)" 
+| fields - number_vendor 
+    ``` source_vendor will contain the vendor from the ICS advisory ```
+    ``` source_vendor_no_punc will contain the vendor from the ICS advisory after spaces and punctuations are removed```
+    ``` asset_vendor will contain the vendor for the assets &amp; identities lookup ``` 
+| eval ics_vendor=if(isnull(ics_vendor),"no_results",ics_vendor) 
+| eval source_vendor=lower(ics_vendor) 
+| eval source_vendor_no_punc = source_vendor 
+| rex mode=sed field=source_vendor_no_punc "s/[\.\-\"\\\_\+\=\s]//g" 
+| rex mode=sed field=source_vendor "s/[\.\-\"\\\_\+\=]//g" 
+| rex mode=sed field=asset_vendor "s/[\.\-\"\\\_\+\=]//g" 
+    ``` breaking up vendors name that are multi-words ``` 
+| makemv asset_vendor 
+| mvexpand asset_vendor 
+| makemv source_vendor 
+| mvexpand source_vendor
+    ``` calculating the phonetic representation of the three strings using the soundex alogrithm found in splunkbase's jellyfisher app``` 
+| jellyfisher soundex(source_vendor) 
+| rename soundex as source_vendor_soundex 
+| jellyfisher soundex(source_vendor_no_punc) 
+| rename soundex as source_vendor_no_punc_soundex 
+| jellyfisher soundex(asset_vendor) 
+| rename soundex as asset_vendor_soundex 
+    ``` to_remove will include generic strings that should not be compared and yield false-positives ``` 
+| eval to_remove = "ltd limited srl ag corp corporation inc incorporated lc llc co company pa spa gmbh systems technology technologies software electric power solutions engineering electronics automation subsidiary industrial labs healthcare power controls international alliance pumps embedded networks and or with by of bv laboratory wireless vision foundation management consortium communication communications" 
+| makemv delim=" " to_remove 
+    ``` finding matches... ``` 
+| eval match_flag=if(((source_vendor_soundex=asset_vendor_soundex OR source_vendor_no_punc_soundex=asset_vendor_soundex) AND NOT (source_vendor IN (to_remove)) ),1,0) 
+| fields - to_remove 
+| search match_flag = 1 
+| dedup site_id ICS_Number ics_vendor 
+| fields site_id ICS_Number ics_vendor
+| search site_id IN ($ms_search_by_site_id$)  ics_vendor IN ($ms_search_by_vendor$) AND (ICS_Number ="*$text_search_by_ics_cert_number$*")
+| lookup  ics_cert_project_lookup  ICS-CERT_Number as ICS_Number
+| rename site_id as "Impacted Site" Original_Release_Date as "Release Date" ICS_Number as "ICS-CERT Number", ICS-CERT_Advisory_Title as "ICS-CERT Advisory Title", Cumulative_CVSS as "CVSS" CVSS_Severity as "Severity" 
+| streamstats count as "#" 
+| table "#"  "Impacted Site" "Release Date" "ICS-CERT Number" Vendor Product "ICS-CERT Advisory Title" CVSS "Severity"</query>
+          <earliest>$global_time_range.earliest$</earliest>
+          <latest>$global_time_range.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+</form>
